@@ -48,28 +48,26 @@ font_grand = pygame.font.SysFont(None, 70)
 # Etats du jeu
 etat_jeu = "MENU"
 difficulte = "Moyen"
-vitesse_de_base = 2.5
 
-# Cible rouge
-rayon = 35
-x = random.randint(rayon, 1280 - rayon)
-y = random.randint(rayon, 720 - rayon)
-dir_x = random.choice([-1, 1])
-dir_y = random.choice([-1, 1])
+# Tailles selon la difficulté
+taille_cube = 55
+taille_doree = 45
 
-# Cible dorée mouvante
-doree_x = 0
-doree_y = 0
-doree_dir_x = 0
-doree_dir_y = 0
+rect_rouge = pygame.Rect(
+    random.randint(0, 1280 - taille_cube),
+    random.randint(0, 720 - taille_cube),
+    taille_cube,
+    taille_cube,
+)
+
+rect_dore = pygame.Rect(0, 0, taille_doree, taille_doree)
 doree_active = False
-doree_rayon = 30  # Légèrement plus grande (30 au lieu de 25)
 dernier_pop_doree = pygame.time.get_ticks()
-duree_doree = 2500  # Dure 2.5 secondes au lieu de 1.5s
+duree_doree = 2500
 
 # Variables de session
 score = 0
-meilleur_score = 100  # Record fixé de Jack
+meilleur_score = 70  # Record fixé de Jack
 temps_limite = 30
 temps_debut = 0
 effets_tir = []
@@ -87,21 +85,35 @@ while running:
 
             # MENU
             if etat_jeu == "MENU":
+                # Adaptation progressive de la taille des cubes
                 if 290 <= pos_souris[0] <= 490 and 380 <= pos_souris[1] <= 440:
                     difficulte = "Facile"
-                    vitesse_de_base = 1.0
+                    taille_cube = 100
+                    taille_doree = 80
                 elif 540 <= pos_souris[0] <= 740 and 380 <= pos_souris[1] <= 440:
                     difficulte = "Moyen"
-                    vitesse_de_base = 2.5
+                    taille_cube = 55
+                    taille_doree = 45
                 elif 790 <= pos_souris[0] <= 990 and 380 <= pos_souris[1] <= 440:
                     difficulte = "Difficile"
-                    vitesse_de_base = 4.0
+                    taille_cube = 25
+                    taille_doree = 20
 
                 if 510 <= pos_souris[0] <= 770 and 480 <= pos_souris[1] <= 550:
                     score = 0
                     temps_debut = pygame.time.get_ticks()
                     dernier_pop_doree = pygame.time.get_ticks()
                     doree_active = False
+
+                    # Mettre à jour la dimension des rectangles selon la difficulté choisie
+                    rect_rouge.width = taille_cube
+                    rect_rouge.height = taille_cube
+                    rect_rouge.x = random.randint(0, 1280 - taille_cube)
+                    rect_rouge.y = random.randint(0, 720 - taille_cube)
+
+                    rect_dore.width = taille_doree
+                    rect_dore.height = taille_doree
+
                     etat_jeu = "JEU"
                     pygame.mouse.set_visible(False)
 
@@ -112,31 +124,20 @@ while running:
 
                 touche = False
 
-                # Cible dorée (+3 pts)
-                if doree_active:
-                    dist_doree = (
-                        (pos_souris[0] - doree_x) ** 2
-                        + (pos_souris[1] - doree_y) ** 2
-                    ) ** 0.5
-                    if dist_doree <= doree_rayon:
-                        score += 3
-                        doree_active = False
-                        touche = True
-                        son_impact_verre.play()
+                # Test clic sur cube doré (+3 pts)
+                if doree_active and rect_dore.collidepoint(pos_souris):
+                    score += 3
+                    doree_active = False
+                    touche = True
+                    son_impact_verre.play()
 
-                # Cible rouge (+1 pt)
-                if not touche:
-                    dist_rouge = (
-                        (pos_souris[0] - x) ** 2 + (pos_souris[1] - y) ** 2
-                    ) ** 0.5
-                    if dist_rouge <= rayon:
-                        score += 1
-                        touche = True
-                        son_impact_verre.play()
-                        x = random.randint(rayon, 1280 - rayon)
-                        y = random.randint(rayon, 720 - rayon)
-                        dir_x = random.choice([-1, 1])
-                        dir_y = random.choice([-1, 1])
+                # Test clic sur cube rouge (+1 pt)
+                if not touche and rect_rouge.collidepoint(pos_souris):
+                    score += 1
+                    touche = True
+                    son_impact_verre.play()
+                    rect_rouge.x = random.randint(0, 1280 - taille_cube)
+                    rect_rouge.y = random.randint(0, 720 - taille_cube)
 
                 # Pénalité clic raté (-1 pt)
                 if not touche:
@@ -165,7 +166,7 @@ while running:
             ((540, 380), "Moyen", "yellow"),
             ((790, 380), "Difficile", "red"),
         ]:
-            epaisse = 3 if difficulte == nom else 1
+            epaisse = 5 if difficulte == nom else 1
             pygame.draw.rect(
                 screen, c, (*pos, 200, 60), width=epaisse, border_radius=10
             )
@@ -185,53 +186,27 @@ while running:
         if temps_restant == 0:
             etat_jeu = "GAME_OVER"
 
-        vitesse_actuelle = vitesse_de_base + (temps_ecoule * 0.3)
-
-        # Cible rouge
-        x += dir_x * vitesse_actuelle
-        y += dir_y * vitesse_actuelle
-        if x - rayon <= 0 or x + rayon >= 1280:
-            dir_x *= -1
-        if y - rayon <= 0 or y + rayon >= 720:
-            dir_y *= -1
-
-        # Apparition cible dorée (toutes les 3s)
+        # Apparition Cube doré (toutes les 3s)
         if not doree_active and temps_actuel - dernier_pop_doree >= 3000:
-            doree_x = random.randint(doree_rayon, 1280 - doree_rayon)
-            doree_y = random.randint(doree_rayon, 720 - doree_rayon)
-            doree_dir_x = random.choice([-1, 1])
-            doree_dir_y = random.choice([-1, 1])
+            rect_dore.x = random.randint(0, 1280 - taille_doree)
+            rect_dore.y = random.randint(0, 720 - taille_doree)
             doree_active = True
             dernier_pop_doree = temps_actuel
 
-        # Déplacement & disparition de la cible dorée
+        if doree_active and temps_actuel - dernier_pop_doree >= duree_doree:
+            doree_active = False
+
+        # Dessin du cube rouge
+        pygame.draw.rect(screen, "red", rect_rouge, border_radius=6)
+        pygame.draw.rect(
+            screen, "white", rect_rouge, width=2, border_radius=6
+        )
+
+        # Dessin du cube doré
         if doree_active:
-            vitesse_doree = vitesse_actuelle * 1.2
-            doree_x += doree_dir_x * vitesse_doree
-            doree_y += doree_dir_y * vitesse_doree
-            if doree_x - doree_rayon <= 0 or doree_x + doree_rayon >= 1280:
-                doree_dir_x *= -1
-            if doree_y - doree_rayon <= 0 or doree_y + doree_rayon >= 720:
-                doree_dir_y *= -1
-
-            if temps_actuel - dernier_pop_doree >= duree_doree:
-                doree_active = False
-
-        # Dessin cible rouge
-        pygame.draw.circle(screen, "red", (int(x), int(y)), rayon)
-        pygame.draw.circle(screen, "white", (int(x), int(y)), int(rayon * 0.6))
-        pygame.draw.circle(screen, "red", (int(x), int(y)), int(rayon * 0.3))
-
-        # Dessin cible dorée
-        if doree_active:
-            pygame.draw.circle(
-                screen, "gold", (int(doree_x), int(doree_y)), doree_rayon
-            )
-            pygame.draw.circle(
-                screen,
-                "white",
-                (int(doree_x), int(doree_y)),
-                int(doree_rayon * 0.5),
+            pygame.draw.rect(screen, "gold", rect_dore, border_radius=6)
+            pygame.draw.rect(
+                screen, "white", rect_dore, width=2, border_radius=6
             )
 
         # Effets de tir
@@ -251,6 +226,9 @@ while running:
 
         # Interface
         screen.blit(font.render(f"Score : {score}", True, "white"), (20, 20))
+        screen.blit(
+            font.render(f"Mode : {difficulte}", True, "gray"), (20, 60)
+        )
         screen.blit(
             font.render(f"Record Jack : {meilleur_score}", True, "gold"),
             (500, 20),
