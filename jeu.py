@@ -31,7 +31,6 @@ def generer_son_verre_casse():
     nb_echantillons = int(frequence * duree)
     tampon = array.array("h")
     for i in range(nb_echantillons):
-        # Bruit blanc / aigu simulant le verre qui éclate
         attenuation = 1 - (i / nb_echantillons)
         bruit = random.randint(-32000, 32000)
         valeur = int(bruit * 0.4 * attenuation)
@@ -64,13 +63,13 @@ doree_y = 0
 doree_dir_x = 0
 doree_dir_y = 0
 doree_active = False
-doree_rayon = 25
+doree_rayon = 30  # Légèrement plus grande (30 au lieu de 25)
 dernier_pop_doree = pygame.time.get_ticks()
-duree_doree = 1500
+duree_doree = 2500  # Dure 2.5 secondes au lieu de 1.5s
 
 # Variables de session
 score = 0
-meilleur_score = 20  # Record fixé de Jack
+meilleur_score = 100  # Record fixé de Jack
 temps_limite = 30
 temps_debut = 0
 effets_tir = []
@@ -102,6 +101,7 @@ while running:
                     score = 0
                     temps_debut = pygame.time.get_ticks()
                     dernier_pop_doree = pygame.time.get_ticks()
+                    doree_active = False
                     etat_jeu = "JEU"
                     pygame.mouse.set_visible(False)
 
@@ -155,9 +155,7 @@ while running:
     if etat_jeu == "MENU":
         pygame.mouse.set_visible(True)
         t_titre = font_grand.render("AIM TRAINER 2D", True, "white")
-        t_record = font.render(
-            f"Record Jack : {meilleur_score}", True, "gold"
-        )
+        t_record = font.render(f"Record Jack : {meilleur_score}", True, "gold")
 
         screen.blit(t_titre, (440, 150))
         screen.blit(t_record, (510, 240))
@@ -197,16 +195,7 @@ while running:
         if y - rayon <= 0 or y + rayon >= 720:
             dir_y *= -1
 
-        # Cible dorée
-        if doree_active:
-            vitesse_doree = vitesse_actuelle * 1.3
-            doree_x += doree_dir_x * vitesse_doree
-            doree_y += doree_dir_y * vitesse_doree
-            if doree_x - doree_rayon <= 0 or doree_x + doree_rayon >= 1280:
-                doree_dir_x *= -1
-            if doree_y - doree_rayon <= 0 or doree_y + doree_rayon >= 720:
-                doree_dir_y *= -1
-
+        # Apparition cible dorée (toutes les 3s)
         if not doree_active and temps_actuel - dernier_pop_doree >= 3000:
             doree_x = random.randint(doree_rayon, 1280 - doree_rayon)
             doree_y = random.randint(doree_rayon, 720 - doree_rayon)
@@ -215,14 +204,25 @@ while running:
             doree_active = True
             dernier_pop_doree = temps_actuel
 
-        if doree_active and temps_actuel - dernier_pop_doree >= duree_doree:
-            doree_active = False
+        # Déplacement & disparition de la cible dorée
+        if doree_active:
+            vitesse_doree = vitesse_actuelle * 1.2
+            doree_x += doree_dir_x * vitesse_doree
+            doree_y += doree_dir_y * vitesse_doree
+            if doree_x - doree_rayon <= 0 or doree_x + doree_rayon >= 1280:
+                doree_dir_x *= -1
+            if doree_y - doree_rayon <= 0 or doree_y + doree_rayon >= 720:
+                doree_dir_y *= -1
 
-        # Dessins
+            if temps_actuel - dernier_pop_doree >= duree_doree:
+                doree_active = False
+
+        # Dessin cible rouge
         pygame.draw.circle(screen, "red", (int(x), int(y)), rayon)
         pygame.draw.circle(screen, "white", (int(x), int(y)), int(rayon * 0.6))
         pygame.draw.circle(screen, "red", (int(x), int(y)), int(rayon * 0.3))
 
+        # Dessin cible dorée
         if doree_active:
             pygame.draw.circle(
                 screen, "gold", (int(doree_x), int(doree_y)), doree_rayon
@@ -234,6 +234,7 @@ while running:
                 int(doree_rayon * 0.5),
             )
 
+        # Effets de tir
         for effet in effets_tir[:]:
             pygame.draw.circle(
                 screen, "yellow", effet["pos"], int(effet["rayon"]), 2
@@ -242,11 +243,13 @@ while running:
             if effet["rayon"] > 25:
                 effets_tir.remove(effet)
 
+        # Viseur
         sx, sy = pygame.mouse.get_pos()
         pygame.draw.circle(screen, "cyan", (sx, sy), 12, 2)
         pygame.draw.line(screen, "cyan", (sx - 18, sy), (sx + 18, sy), 2)
         pygame.draw.line(screen, "cyan", (sx, sy - 18), (sx, sy + 18), 2)
 
+        # Interface
         screen.blit(font.render(f"Score : {score}", True, "white"), (20, 20))
         screen.blit(
             font.render(f"Record Jack : {meilleur_score}", True, "gold"),
@@ -260,9 +263,7 @@ while running:
         pygame.mouse.set_visible(True)
         t_over = font_grand.render("TEMPS ÉCOULÉ !", True, "red")
         t_final = font.render(f"Score final : {score}", True, "white")
-        t_rec = font.render(
-            f"Record de Jack : {meilleur_score}", True, "gold"
-        )
+        t_rec = font.render(f"Record de Jack : {meilleur_score}", True, "gold")
         t_restart = font.render(
             "Appuie sur ESPACE pour revenir au menu", True, "gray"
         )
